@@ -1,0 +1,2 @@
+USE_SOFTMAX = False
+FILTER_OUT = True

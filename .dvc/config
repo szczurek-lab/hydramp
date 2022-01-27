@@ -1,0 +1,4 @@
+[core]
+    remote = gd
+['remote "gd"']
+    url = gdrive://1R3FBys0nEnGwMtfd-iH9C3OaBcgYS_2L/dvc_storage
