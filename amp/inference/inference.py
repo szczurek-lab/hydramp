@@ -12,7 +12,8 @@ from tqdm import tqdm
 
 from amp.config import LATENT_DIM
 from amp.data_utils import sequence as du_sequence
-from amp.inference.filtering import filter_out_aa_clusters
+from amp.inference.filtering import check_sequence_for_hydrophobic_clusters, check_sequence_for_repetitive_clusters, \
+    check_sequence_for_positive_clusters, filter_out_aa_clusters
 from amp.utils.basic_model_serializer import load_master_model_components
 from amp.utils.generate_peptides import translate_peptide
 from amp.utils.phys_chem_propterties import calculate_physchem_prop
@@ -85,7 +86,7 @@ def slice_blocks(flat_arrays: Tuple[np.ndarray, ...], block_size: int) -> Tuple[
     return tuple([x.reshape(-1, block_size).T.flatten() for x in flat_arrays])
 
 
-class HYDRAmpGenerator:
+class HydrAMPGenerator:
     def __init__(self, model_path: str, decomposer_path: str, softmax=False):
         components = load_master_model_components(model_path, return_master=True, softmax=softmax)
         self.model_path = model_path
@@ -132,7 +133,8 @@ class HYDRAmpGenerator:
             transposed_results.append(item_generated_sequences)
         return transposed_results
 
-    def select_peptides(self, peptides, amp, mic, n_attempts: int = 64, target_positive: bool = True):
+    @staticmethod
+    def select_peptides(peptides, amp, mic, n_attempts: int = 64, target_positive: bool = True):
         amp = amp.reshape(n_attempts, -1)
         mic = mic.reshape(n_attempts, -1)
         if target_positive:
@@ -179,12 +181,8 @@ class HYDRAmpGenerator:
                  list of dicts , each dict encloses a single peptide with its properties
         """
         mode = mode.lower().strip()
-        if mode == 'amp':
-            mode = True
-        elif mode == 'nonamp':
-            mode = False
-        else:
-            raise ValueError(f"mode can be either 'amp' or 'nonamp' but was {mode}")
+        assert mode in ['amp', 'nonamp'], "Generation mode not recognised"
+        mode = (mode == 'amp')
 
         set_seed(seed)
         amp_input = mic_input = 1 if mode else 0
@@ -264,33 +262,30 @@ class HYDRAmpGenerator:
 
         return self._encapsulate_sequential_results([generated_data])[0]
 
-    def template_generation(self, sequences: List[str],
-                            constraint: Literal['relative', 'absolute'] = 'absolute',
-                            mode: Literal['improve', 'worsen'] = 'improve',
-                            n_attempts: int = 100, temp=5, **kwargs) -> Dict[Any, Dict[str, Any]]:
+    def analogue_generation(self, sequences: List[str], seed: int,
+                            filtering_criteria: Literal['improvement', 'discovery'] = 'improvement',
+                            n_attempts: int = 100, temp: float = 5.0, **kwargs) -> Dict[Any, Dict[str, Any]]:
         """
         Generates new peptides based on input sequences
         @param sequences: peptides that form a template for further processing
-        @param constraint: 'relative' if generated peptides should be strictly better than input sequences (higher
-        P(AMP), lower P(MIC) in case of positive generation; lower P(AMP), higher P(MIC) in case on negative generation)
-        'absolute' if generated sequences should be good enough but not strictly better
-        @param mode: 'improve' for generating more  active peptide, 'worsen' for generating less active peptide
+        @param filtering_criteria: 'improvement' if generated peptides should be strictly better than input sequences
+        'discovery' if generated sequences should be good enough but not strictly better
         @param n_attempts: how many times a single latent vector is decoded - for normal Softmax models it should be set
         to 1 as every decoding call returns the same peptide.
         @param temp: creativity parameter. Controls latent vector sigma scaling
+        @param seed:
         @param kwargs:additional boolean arguments for filtering. This include
         - filter_positive_clusters
-        - filter_repetitive_clusters
+        - filter_repetitive_clusters or filter_hydrophobic_clusters
         - filter_cysteins
         - filter_known_amps
 
         @return: dict, each key corresponds to a single input sequence.
         """
-        constraint = constraint.strip().lower()
-        mode = mode.strip().lower()
-        assert constraint == 'relative' or constraint == 'absolute', "Unrecognised template constraint"
-        assert mode == 'improve' or mode == 'worsen', "Unrecognised template mode"
-        mode = (mode == 'improve')
+        set_seed(seed)
+        filtering_criteria = filtering_criteria.strip().lower()
+        assert filtering_criteria == 'improvement' or filtering_criteria == 'discovery', \
+            "Unrecognised filtering constraint"
 
         block_size = len(sequences)
         padded_sequences = du_sequence.pad(du_sequence.to_one_hot(sequences))
@@ -305,8 +300,7 @@ class HYDRAmpGenerator:
         noise = np.random.normal(loc=0, scale=temp * np.vstack([sigmas] * n_attempts), size=z.shape)
         encoded = z + noise
 
-        amp_condition = mic_condition = np.ones((len(padded_sequences), 1)) if mode else np.zeros(
-            (len(padded_sequences), 1))
+        amp_condition = mic_condition = np.ones((len(padded_sequences), 1))
 
         conditioned = np.hstack([
             encoded,
@@ -319,21 +313,13 @@ class HYDRAmpGenerator:
         new_amp = self._amp_classifier.predict(new_peptides, verbose=1, batch_size=80000)
         new_mic = self._mic_classifier.predict(new_peptides, verbose=1, batch_size=80000)
 
-        if constraint == 'relative':
-            if mode:
-                better = new_amp > amp_stacked.reshape(-1, 1)
-                better = better & (new_mic > mic_stacked.reshape(-1, 1))
-            else:
-                better = new_amp < amp_stacked.reshape(-1, 1)
-                better = better & (new_mic < mic_stacked.reshape(-1, 1))
-
+        if filtering_criteria == 'improvement':
+            better = new_amp > amp_stacked.reshape(-1, 1)
+            better = better & (new_mic > mic_stacked.reshape(-1, 1))
         else:
-            if mode:
-                better = new_amp >= 0.8
-                better = better & (new_mic > 0.5)
-            else:
-                better = new_amp < 0.2
-                better = better & (new_mic < 0.25)
+            better = new_amp >= 0.8
+            better = better & (new_mic > 0.5)
+
         better = better.flatten()
 
         new_peptides = np.array([translate_peptide(x) for x in new_peptides])

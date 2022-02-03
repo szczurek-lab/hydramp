@@ -1,3 +1,3 @@
-from .inference import HYDRAmpGenerator
+from .inference import HydrAMPGenerator
 
-__all__ = ["HYDRAmpGenerator"]
+__all__ = ["HydrAMPGenerator"]

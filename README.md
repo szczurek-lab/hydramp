@@ -1,43 +1,70 @@
-# HYDRAmp - cvae++ approach to generate new amps
+# HydrAMP: a deep generative model for antimicrobial peptide discovery
 
-### How to generate peptides with HYDRAmp
+### Data
 
-First, install package via
+Data is available via [DVC](https://dvc.org/) and can be obtained by running  following commands within repo root directory:
+
+```
+pip install dvc[gdrive]
+dvc pull
+```
+This puts all data in appropriate directories, which makes code ready-to-be-run. You can also request specific directories/files. Please see [dvc pull doc](https://dvc.org/doc/command-reference/pull). You will be prompted to your Google account for access.
+
+DVC ensures data version is paired with code. Alternatively, you can download data directly through [Google Drive](https://drive.google.com/drive/folders/1IwJjwSKpXYWWALKXM8nghqmlSvyu3BYq?usp=sharing). 
+
+#### Available data: 
+- data - training data for peptides < 25 AA (16.8 MB)
+- models - checkpoints of HydrAMP, PepCVAE, and Basic models for every training epoch (466 MB)
+- results - dumped generation results for every model. Required for running comparison notebooks (832 MB)
+- wheels - custom TensorFlow packages (1 GB). See [Required software](#required-software) below. 
+
+
+### Required software
+
+HydrAMP was tested under Linux and Windows running python 3.8. Other python versions might work as well but it is not guaranteed. All required packages are enclosed in `setup.py`. Run:
 
 ```console
 pip install .
 ```
 
-interface for generating peptides is enclosed in `HYDRAmpGenerator` class. Latest model can be found under `models/HydrAMP/37`  and latest decomposer can be found under `models/HydrAMP/pca_decomposer.joblib`. Initialize object with path to model and decomposer
+to install HydrAMP and other required packages. This should take up to 10 minutes with 50Mbps internet.
+
+
+If you plan to retrain HydrAMP, you are going to need custom TensorFlow wheels that have some cherry-picked bug fixes. It is not possible to use TensorFlow version where these bugs are fixed since API changed significantly (Keras-Tensorflow side) and this would require to rewrite training code. These wheels can be found under  in `wheels/` via DVC
+
+
+
+### How to generate peptides with HydrAMP
+
+Interface for generating peptides is enclosed in `HYDRAmpGenerator` class. Latest model can be found under `models/HydrAMP/37`  and latest decomposer can be found under `models/HydrAMP/pca_decomposer.joblib`.  You can find useful scripts under `amp/inference/scripts`.
+
+Initialize object with path to model and decomposer:
 
 ```python
-from amp.inference import HYDRAmpGenerator
+from amp.inference import HydrAMPGenerator
 
-generator = HYDRAmpGenerator(model_path, decomposer_path)
+generator = HydrAMPGenerator(model_path, decomposer_path)
 ```
 
 The package provides 2 modes for peptide generation:
 
-- **template generation** - allows to change the properties of existing sequences (it may try to make antimicrobial peptides non-amp, non-antimicrobial peptides amp) 
+- **analouge generation** - use existing peptides as starting points to find new AMPs 
 ```python
-   def template_generation(self, sequences: List[str],
-                            constraint: Literal['relative', 'absolute'] = 'absolute',
-                            mode: Literal['improve', 'worsen'] = 'improve',
-                            n_attempts: int = 100, temp=5, **kwargs) -> Dict[Any, Dict[str, Any]]:
+def analogue_generation(self, sequences: List[str], seed: int,
+                    filtering_criteria: Literal['improvement', 'discovery'] = 'improvement',
+                    n_attempts: int = 100, temp: float = 5.0, **kwargs) -> Dict[Any, Optional[Dict[str, Any]]]:
 ```
 >*Parameters:*
 >
 >`sequences` - list of peptide sequences to process
 >
-> `constraint` - 'relative' if generated peptides should be strictly better than input sequences (higher
-        P(AMP), lower P(MIC) in case of positive generation; lower P(AMP), higher P(MIC) in case on negative generation)
-        'absolute' if generated sequences should be good enough but not strictly better
->
-> `mode` - "*improve*" or "*worsen*",
+> `filtering_criteria` - 'improvement' if generated peptides should be strictly better than input sequences (higher
+        P(AMP), lower P(MIC) in case of positive generation);
+        'discovery' if generated sequences should be good enough but not strictly better
 >
 > `n_attempt` - how many times a single latent vector is decoded 
 >
-> `seed` - seed for reproducible results
+> `seed` - seed for reproducible results 
 > 
 > `**kwargs` - additional boolean arguments for filtering. See [filtering options](#filtering-options)
 >
@@ -53,16 +80,17 @@ The package provides 2 modes for peptide generation:
 > - **hydrophobic_moment**
 > - **charge**
 > - **isoelectric_point**
-> - **h-score - [see H-score description](#h-score)**
 >
 > and 
 > - **generated_sequences** - list of generated and filtered sequences, each described with a dict as above
+
+#### Example call (try to improve Pexiganan and Temporin A with 100 attempts and a default temperature)
+
 ```python
-# exemplary method call for Pexiganan and Temporin A (number of generated sequences was trunkated)
->> generator.template_generation(sequences=['GIGKFLKKAKKFGKAFVKILKK' 'FLPLIGRVFSGIL'],
-                              mode="improve",
-                              constraint='absolute',
-                              n_attempts=100)
+# exemplary method call for Pexiganan and Temporin A (generated sequences were truncated)
+>> generator.analogue_generation(sequences=['GIGKFLKKAKKFGKAFVKILKK' 'FLPLIGRVFSGIL'],
+                                 filtering_criteria='improvement',
+                                 n_attempts=100)
 
 {'FLPLIGRVLSGIL': {'amp': 0.9999972581863403,
                    'charge': 1.996,
@@ -168,23 +196,18 @@ def unconstrained_generation(self,
   'mic': 0.06286950409412384,
   'sequence': 'GLLGGLLKRRRFVR'}]
 
-# call with filtering
-
->> generator.unconstrained_generation(n_target=2, mode="amp", properties=False, filter_positive_clusters=True)
-
-
 ```
+
+### Retraining HydrAMP and its ablated version as well as classifiers
+
+You can find notebooks for retraining all models under `scripts/`. This includes `{hydra, pepcvae, basic}_training_procedure.ipynb` and `{amp, mic}_classifier_training_procedure`. Training a single model takes about 14h on NVIDIA RTX 2080 and a 2.4GHz CPU with total of 32 threads. 
+
 
 ### Filtering options
 
 The following are additional filtering:
 
-- **filter_positive_clusters** -  do not allow 3 hydrophobic aminoacids in a row
+- **filter_hydrophobic_clusters** -  do not allow 3 hydrophobic aminoacids in a row
 - **filter_repetitive_clusters** - do not allow the same aminoacid repetead 3 times in a 5-sized window
 - **filter_cysteins** - filter peptides with cysteins
 - **filter_known_amps** - remove all generated peptides that were found in databases
-
-### H-score
-
-TODO
-

@@ -3,14 +3,14 @@ from setuptools import setup
 
 setup(
     name='HydrAMP',
-    version='0.3.0',
+    version='1.0',
     description='Python package for peptide generation',
     author='Paulina Szymczak',
     author_email='szymczak.pau@gmail.com',
-    url='https://www.hydramp.mimuw.edu/',
+    url='https://hydramp.mimuw.edu/',
     packages=find_packages(),
     install_requires=[
-        'tensorflow~=2.2.0',
+        'tensorflow~=2.2.1',
         'tensorflow-probability~=0.10.0',
         'Keras~=2.3.1',
         'Keras-Applications~=1.0.8',
