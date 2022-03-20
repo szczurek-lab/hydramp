@@ -55,7 +55,7 @@ def _dispose_into_bucket(intersection: np.ndarray,
     disposed_generated_sequences = []
     for origin_seq, (left_index, right_index) in zip(prototype_sequences, zip(bucket_indices, bucket_indices[1:])):
         # in case of low temperature it might be the case that an analouge will be actually a peptide we start from
-        intersection &= (generated_sequences[left_index:right_index] != origin_seq)
+        intersection[left_index:right_index] &= (generated_sequences[left_index:right_index] != origin_seq)
         current_bucket_indices = intersection[left_index:right_index]
         current_bucket_sequences = generated_sequences[left_index:right_index][current_bucket_indices].tolist()
         if not current_bucket_sequences:
