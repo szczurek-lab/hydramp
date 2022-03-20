@@ -34,6 +34,7 @@ def _apply_along_axis_improved(func: Callable[[np.ndarray, int], np.ndarray], ax
 
 
 def _dispose_into_bucket(intersection: np.ndarray,
+                         prototype_sequences: List[str],
                          generated_sequences: np.ndarray,
                          generated_amp: np.ndarray,
                          generated_mic: np.ndarray,
@@ -52,7 +53,9 @@ def _dispose_into_bucket(intersection: np.ndarray,
     """
     bucket_indices = np.arange(0, (attempts + 1) * block_size, attempts)
     disposed_generated_sequences = []
-    for left_index, right_index in zip(bucket_indices, bucket_indices[1:]):
+    for origin_seq, (left_index, right_index) in zip(prototype_sequences, zip(bucket_indices, bucket_indices[1:])):
+        # in case of low temperature it might be the case that an analouge will be actually a peptide we start from
+        intersection &= (generated_sequences[left_index:right_index] != origin_seq)
         current_bucket_indices = intersection[left_index:right_index]
         current_bucket_sequences = generated_sequences[left_index:right_index][current_bucket_indices].tolist()
         if not current_bucket_sequences:
@@ -329,7 +332,7 @@ class HydrAMPGenerator:
         new_peptides, new_amp, new_mic, better = slice_blocks((new_peptides, new_amp, new_mic, better), block_size)
         mask = get_filtering_mask(sequences=new_peptides, filtering_options=kwargs)
         mask &= better
-        filtered_peptides = _dispose_into_bucket(better, new_peptides, new_amp, new_mic, n_attempts, block_size)
+        filtered_peptides = _dispose_into_bucket(better, sequences, new_peptides, new_amp, new_mic, n_attempts, block_size)
         filtered_peptides = self._encapsulate_sequential_results(filtered_peptides)
         generation_result = {
             'sequence': sequences,
