@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='HydrAMP',
-    version='1.0',
+    version='1.1.0',
     description='Python package for peptide generation',
     author='Paulina Szymczak',
     author_email='szymczak.pau@gmail.com',

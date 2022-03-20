@@ -15,18 +15,22 @@ def check_sequence_for_positive_clusters(sequence: str, threshold: int = 3) -> b
     aa_windows = [sequence[i:i + 5] for i in range(len(sequence) - 4)]
     # Calculate the number of positively charged amino acids: R and K in each window
     # If all amino acids in threshold-sized window are positive, discard sequence
-    return threshold in [aa_window.count('K') + aa_window.count('R') for aa_window in aa_windows]
+    return (np.array([aa_window.count('K') + aa_window.count('R') for aa_window in aa_windows]) < threshold).all()
+
+
+def check_for_cysteins(sequence: str):
+    return 'C' not in sequence
 
 
 def check_sequence_for_repetitive_clusters(sequence: str) -> bool:
-    return any(a == b == c for a, b, c in zip(sequence, sequence[1:], sequence[2:]))
+    return not any(a == b == c for a, b, c in zip(sequence, sequence[1:], sequence[2:]))
 
 
 def check_sequence_for_hydrophobic_clusters(sequence: str) -> bool:
     ch = False
     for hydrophobic_aa in ['F', 'I', 'L', 'V', 'W', 'M', 'A']:
         ch |= any(a == b == c == hydrophobic_aa for a, b, c in zip(sequence, sequence[1:], sequence[2:]))
-    return ch
+    return not ch
 
 
 def filter_out_positive_clusters(data: pd.DataFrame) -> pd.DataFrame:
@@ -35,14 +39,14 @@ def filter_out_positive_clusters(data: pd.DataFrame) -> pd.DataFrame:
 
 def get_filtering_mask(sequences: np.ndarray, filtering_options):
     accept = True
-    if filtering_options['filter_out_cysteins']:
-        accept = np.apply_along_axis(sequences, check_sequence_for_repetitive_clusters)
-    if filtering_options['filter_out_hydrophobic_clusters']:
-        accept = np.apply_along_axis(sequences, check_sequence_for_repetitive_clusters)
-    if filtering_options['filter_out_repetitive_clusters']:
-        accept = np.apply_along_axis(sequences, check_sequence_for_repetitive_clusters)
-    if filtering_options['filter_out_known_amps']:
-        accept = np.apply_along_axis(sequences, check_sequence_for_repetitive_clusters)
+    if filtering_options.get('filter_out_cysteins', False):
+        accept &= np.vectorize(check_for_cysteins)(sequences)
+    if filtering_options.get('filter_out_hydrophobic_clusters', False):
+        accept &= np.vectorize(check_sequence_for_repetitive_clusters)(sequences)
+    if filtering_options.get('filter_out_positive_clusters', False):
+        accept &= np.vectorize(check_sequence_for_positive_clusters)(sequences)
+    if filtering_options.get('filter_out_known_amps', False):
+        accept &= np.vectorize(check_sequence_for_positive_clusters)(sequences)
     return accept
 
 
