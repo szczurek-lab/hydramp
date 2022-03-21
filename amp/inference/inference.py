@@ -93,7 +93,7 @@ class HydrAMPGenerator:
         components = load_master_model_components(model_path, return_master=True, softmax=softmax)
         self.model_path = model_path
         self.decomposer_path = decomposer_path
-        self._encoder, self._decoder, self._mic_classifier, self._amp_classifier, self.master = components
+        self._encoder, self._decoder, self._amp_classifier, self._mic_classifier, self.master = components
         self._latent_decomposer: PCA = joblib.load(decomposer_path)
         self._sigma_model = self.get_sigma_model()
 
@@ -332,7 +332,8 @@ class HydrAMPGenerator:
         new_peptides, new_amp, new_mic, better = slice_blocks((new_peptides, new_amp, new_mic, better), block_size)
         mask = get_filtering_mask(sequences=new_peptides, filtering_options=kwargs)
         mask &= better
-        filtered_peptides = _dispose_into_bucket(better, sequences, new_peptides, new_amp, new_mic, n_attempts, block_size)
+        filtered_peptides = _dispose_into_bucket(better, sequences, new_peptides, new_amp, new_mic, n_attempts,
+                                                 block_size)
         filtered_peptides = self._encapsulate_sequential_results(filtered_peptides)
         generation_result = {
             'sequence': sequences,
