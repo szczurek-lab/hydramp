@@ -12,8 +12,7 @@ from tqdm import tqdm
 
 from amp.config import LATENT_DIM
 from amp.data_utils import sequence as du_sequence
-from amp.inference.filtering import check_sequence_for_hydrophobic_clusters, check_sequence_for_repetitive_clusters, \
-    check_sequence_for_positive_clusters, filter_out_aa_clusters
+from amp.inference.filtering import get_filtering_mask
 from amp.utils.basic_model_serializer import load_master_model_components
 from amp.utils.generate_peptides import translate_peptide
 from amp.utils.phys_chem_propterties import calculate_physchem_prop
@@ -35,6 +34,7 @@ def _apply_along_axis_improved(func: Callable[[np.ndarray, int], np.ndarray], ax
 
 
 def _dispose_into_bucket(intersection: np.ndarray,
+                         prototype_sequences: List[str],
                          generated_sequences: np.ndarray,
                          generated_amp: np.ndarray,
                          generated_mic: np.ndarray,
@@ -53,7 +53,9 @@ def _dispose_into_bucket(intersection: np.ndarray,
     """
     bucket_indices = np.arange(0, (attempts + 1) * block_size, attempts)
     disposed_generated_sequences = []
-    for left_index, right_index in zip(bucket_indices, bucket_indices[1:]):
+    for origin_seq, (left_index, right_index) in zip(prototype_sequences, zip(bucket_indices, bucket_indices[1:])):
+        # in case of low temperature it might be the case that an analouge will be actually a peptide we start from
+        intersection[left_index:right_index] &= (generated_sequences[left_index:right_index] != origin_seq)
         current_bucket_indices = intersection[left_index:right_index]
         current_bucket_sequences = generated_sequences[left_index:right_index][current_bucket_indices].tolist()
         if not current_bucket_sequences:
@@ -91,7 +93,7 @@ class HydrAMPGenerator:
         components = load_master_model_components(model_path, return_master=True, softmax=softmax)
         self.model_path = model_path
         self.decomposer_path = decomposer_path
-        self._encoder, self._decoder, self._mic_classifier, self._amp_classifier, self.master = components
+        self._encoder, self._decoder, self._amp_classifier, self._mic_classifier, self.master = components
         self._latent_decomposer: PCA = joblib.load(decomposer_path)
         self._sigma_model = self.get_sigma_model()
 
@@ -209,7 +211,7 @@ class HydrAMPGenerator:
                 generated_sequences = np.array(generated_sequences).reshape(n_attempts, -1)
                 generated_amp = generated_amp.reshape(n_attempts, -1)
                 generated_mic = generated_mic.reshape(n_attempts, -1)
-                if mode:
+                if mode:  # if mode is amp
                     best = generated_amp.argmax(axis=0)
                 else:
                     best = generated_amp.argmin(axis=0)
@@ -226,10 +228,16 @@ class HydrAMPGenerator:
                                                                                      n_attempts=n_attempts,
                                                                                      target_positive=mode)
 
+            phych_chem_mask = get_filtering_mask(sequences=generated_sequences, filtering_options=kwargs)
+            phych_chem_mask_idx = np.arange(0, len(generated_sequences))
+            phych_chem_mask = phych_chem_mask_idx if type(phych_chem_mask) is bool \
+                else phych_chem_mask_idx[phych_chem_mask]
             amp_good_indices = np.argwhere((generated_amp >= min_amp) & (generated_amp <= max_amp)).flatten()
             mic_good_indices = np.argwhere((generated_mic >= min_mic) & (generated_mic <= max_mic)).flatten()
             _, is_unique_indices = np.unique(generated_sequences, return_index=True)
-            intersection = reduce(np.intersect1d, (amp_good_indices, mic_good_indices, is_unique_indices))
+
+            intersection = reduce(np.intersect1d,
+                                  (amp_good_indices, mic_good_indices, is_unique_indices, phych_chem_mask))
 
             if len(intersection) == 0:
                 continue
@@ -237,8 +245,6 @@ class HydrAMPGenerator:
             properly_generated_sequences = pd.DataFrame.from_dict({
                 'sequence': generated_sequences[intersection]
             }).set_index(intersection)
-
-            properly_generated_sequences = filter_out_aa_clusters(properly_generated_sequences)
 
             accepted_sequences.extend(properly_generated_sequences['sequence'].tolist())
             accepted_amp.extend(generated_amp[properly_generated_sequences.index].tolist())
@@ -324,7 +330,10 @@ class HydrAMPGenerator:
 
         new_peptides = np.array([translate_peptide(x) for x in new_peptides])
         new_peptides, new_amp, new_mic, better = slice_blocks((new_peptides, new_amp, new_mic, better), block_size)
-        filtered_peptides = _dispose_into_bucket(better, new_peptides, new_amp, new_mic, n_attempts, block_size)
+        mask = get_filtering_mask(sequences=new_peptides, filtering_options=kwargs)
+        mask &= better
+        filtered_peptides = _dispose_into_bucket(better, sequences, new_peptides, new_amp, new_mic, n_attempts,
+                                                 block_size)
         filtered_peptides = self._encapsulate_sequential_results(filtered_peptides)
         generation_result = {
             'sequence': sequences,
