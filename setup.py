@@ -21,10 +21,12 @@ setup(
         'scikit-learn~=0.23.2',
         'modlamp~=4.2.3',
         'matplotlib~=3.3.2',
+        'protobuf~=3.14.0',
         'seaborn~=0.11.0',
         'setuptools~=50.3.1',
         'joblib~=0.17.0',
         'argparse',
         'tqdm~=4.51.0'
-    ]
+    ],
+    setup_requires=['wheel']
 )
