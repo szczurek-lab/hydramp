@@ -1,4 +1,8 @@
+
+<img align="right" src="static/Frog_noOutline_2.png" width="200"> 
+
 # HydrAMP: a deep generative model for antimicrobial peptide discovery
+
 
 ### Data
 
