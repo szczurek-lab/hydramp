@@ -3,7 +3,7 @@
 
 # HydrAMP: a deep generative model for antimicrobial peptide discovery
 
-
+[![DOI](https://zenodo.org/badge/452699400.svg)](https://zenodo.org/badge/latestdoi/452699400)
 ### Data
 
 Data is available via [DVC](https://dvc.org/) and can be obtained by running  following commands within repo root directory:
