@@ -1,0 +1,21 @@
+[project]
+name = "hydramp-data"
+version = "0.1.0"
+description = "Enviroment to download data for HydrAMP"
+authors = [
+    {name = "Wojciech Zarzecki", email = "wojciechzarzecki5@gmail.com"},
+]
+dependencies = [
+    "gdown>=5.2.0",
+]
+requires-python = "==3.8.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
