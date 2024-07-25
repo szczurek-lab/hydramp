@@ -9,10 +9,8 @@ Data is hosted at google drive: https://drive.google.com/drive/folders/1IwJjwSKp
 
 You can either:
 - manually download and extract it
-- use script `get_data.sh`
-  - create dedicated environment
-    - via pdm: `pdm install` (or with your favorite environment manager and install dependencies via running `pip install .`) from 'data_setup' dir - *see: https://pdm-project.org/en/latest/*
-  - from root run `sh ./get_data.sh`
+- use script _(requires virtual HydrAMP environment - see [Required software](#required-software) below)_ 
+   - run  `sh ./get_data.sh`
 
 
 #### Available data: 

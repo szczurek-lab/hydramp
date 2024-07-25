@@ -26,7 +26,8 @@ setup(
         'setuptools~=50.3.1',
         'joblib~=0.17.0',
         'argparse',
-        'tqdm~=4.51.0'
+        'tqdm~=4.51.0',
+        'gdown>=5.2.0'
     ],
     setup_requires=['wheel']
 )
