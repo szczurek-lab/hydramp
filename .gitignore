@@ -140,3 +140,4 @@ cython_debug/
 /data
 /results
 /wheels
+/downloaded_data_zips

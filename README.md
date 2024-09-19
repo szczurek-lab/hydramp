@@ -5,16 +5,13 @@
 
 [![DOI](https://zenodo.org/badge/452699400.svg)](https://zenodo.org/badge/latestdoi/452699400)
 ### Data
+Data is hosted at google drive: https://drive.google.com/drive/folders/1IwJjwSKpXYWWALKXM8nghqmlSvyu3BYq
 
-Data is available via [DVC](https://dvc.org/) and can be obtained by running  following commands within repo root directory:
+You can either:
+- manually download and extract it
+- use script _(requires virtual HydrAMP environment - see [Required software](#required-software) below)_ 
+   - run  `sh ./get_data.sh`
 
-```
-pip install dvc[gdrive]
-dvc pull
-```
-This puts all data in appropriate directories, which makes code ready-to-be-run. You can also request specific directories/files. Please see [dvc pull doc](https://dvc.org/doc/command-reference/pull). You will be prompted to your Google account for access.
-
-DVC ensures data version is paired with code. Alternatively, you can download data directly through [Google Drive](https://drive.google.com/drive/folders/1IwJjwSKpXYWWALKXM8nghqmlSvyu3BYq?usp=sharing). 
 
 #### Available data: 
 - data - training data for peptides < 25 AA (16.8 MB)
