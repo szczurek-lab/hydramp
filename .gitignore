@@ -141,3 +141,6 @@ cython_debug/
 /results
 /wheels
 /downloaded_data_zips
+
+# IDEs
+.idea
