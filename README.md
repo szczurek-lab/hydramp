@@ -5,7 +5,7 @@
 
 [![DOI](https://zenodo.org/badge/452699400.svg)](https://zenodo.org/badge/latestdoi/452699400)
 ### Data
-Data is hosted at google drive: https://drive.google.com/drive/folders/1IwJjwSKpXYWWALKXM8nghqmlSvyu3BYq
+Data is hosted at google drive: https://drive.google.com/drive/folders/1krim1ugqNDmgmHZCFSOvmynWxCSzyOto
 
 You can either:
 - manually download and extract it
